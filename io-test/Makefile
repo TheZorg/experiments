@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=
-LDFLAGS=
+CFLAGS= -fopenmp
+LDFLAGS= -fopenmp
 DEPS=
 SOURCES=main.c
 OBJECTS=$(SOURCES:.c=.o)

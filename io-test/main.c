@@ -17,6 +17,7 @@ int main(int argc, char **argv) {
     buf = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, 0);
 
     sum = 0;
+#pragma omp parallel for reduction(+:sum)
     for (i = 0; i < length/sizeof(uint64_t); i++) {
         sum += buf[i];
     }
