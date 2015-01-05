@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS= -fopenmp
-LDFLAGS= -fopenmp
+LDFLAGS= -fopenmp -lpapi
 DEPS=
 SOURCES=main.c
 OBJECTS=$(SOURCES:.c=.o)
@@ -12,4 +12,4 @@ all: $(SOURCES) $(TARGET)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+	$(CC) $(OBJECTS) $(LDFLAGS) -o $@

@@ -7,8 +7,12 @@
 #include <sys/stat.h>
 #include <x86intrin.h>
 #include <getopt.h>
+#include <papi.h>
+#include <pthread.h>
 
 #define PROGNAME "io-test"
+
+#define NUM_EVENTS 1
 
 static const char *const progname = PROGNAME;
 static const int PAGE_SIZE = 4096;
@@ -117,13 +121,18 @@ int main(int argc, char **argv) {
 
     buf = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, 0);
 
+    // Initialize PAPI
+    int events[NUM_EVENTS] = {PAPI_TOT_INS};
+
+    PAPI_library_init(PAPI_VER_CURRENT);
+    PAPI_thread_init(pthread_self);
+
 #pragma omp parallel private(i, j) reduction(+:sum) reduction(+:cycles)
     {
-        uint64_t start, end;
+        long long int values[NUM_EVENTS];
         int pages = 0;
         sum = 0;
-        // get cycle count from rdtsc
-        start = __rdtsc();
+        PAPI_start_counters(events, NUM_EVENTS);
 #pragma omp for
         for (i = 0; i < length; i += 4096) {
             // Use only one byte per page
@@ -133,14 +142,12 @@ int main(int argc, char **argv) {
             }
             pages++;
         }
-        end = __rdtsc();
-        cycles = end - start;
+        PAPI_read_counters(values, NUM_EVENTS);
         if (vars->verbose) {
-            printf("Thread %d pages:%'d cycles:%'lu\n", omp_get_thread_num(), pages, cycles);
+            printf("Thread %d pages:%'d instr/page:%'lld\n", omp_get_thread_num(), pages, values[0]/pages);
         }
     }
     printf("sum=%'lu\n", sum);
-    printf("cycles=%'lu\n", cycles);
 
     return 0;
 }
