@@ -119,7 +119,6 @@ int main(int argc, char **argv) {
     int fd;
     off_t length;
     int pages;
-    uint64_t cycles = 0;
 
     volatile uint64_t sum;
 
@@ -152,7 +151,9 @@ int main(int argc, char **argv) {
     PAPI_thread_init(pthread_self);
 
     omp_set_num_threads(vars->threads);
+#ifndef NO_OMP
 #pragma omp parallel reduction(+:sum)
+#endif
     {
         int i, j;
         long long int values[NUM_EVENTS];
@@ -160,6 +161,7 @@ int main(int argc, char **argv) {
         char *buf;
         off_t to_read;
         int pages;
+        int iterations = vars->iterations;
 
         PAPI_start_counters(events, NUM_EVENTS);
         while (remaining > 0) {
@@ -169,11 +171,13 @@ int main(int argc, char **argv) {
             madvise(buf, to_read, MADV_SEQUENTIAL);
             pages = 0;
             sum = 0;
+#ifndef NO_OMP
 #pragma omp for
+#endif
             for (i = 0; i < to_read; i+= 4096) {
                 // Use only one byte per page
                 sum += buf[i];
-                for (j = 0; j < vars->iterations; j++) {
+                for (j = 0; j < iterations; j++) {
                     sum++;
                 }
                 pages++;
