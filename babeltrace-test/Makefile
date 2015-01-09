@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS= -I../contrib/babeltrace/include `pkg-config --cflags glib-2.0`
-LDFLAGS= `pkg-config --libs glib-2.0` -lpapi -lbabeltrace -lbabeltrace-ctf
+CFLAGS= -I../contrib/babeltrace/include `pkg-config --cflags glib-2.0` -g
+LDFLAGS= `pkg-config --libs glib-2.0` -lpapi -lbabeltrace -lbabeltrace-ctf -g
 DEPS=
 SOURCES=main.c
 OBJECTS=$(SOURCES:.c=.o)

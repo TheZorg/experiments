@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <x86intrin.h>
 #include <pthread.h>
+#include <time.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -16,6 +17,9 @@
 #define PROGNAME "io-test"
 
 #define NUM_EVENTS 1
+#define NSECS_IN_MSEC 1000000
+#define NSECS_IN_SEC 1000000000
+#define BYTES_IN_MBYTE 1000000
 
 static const char *const progname = PROGNAME;
 static const int PAGE_SIZE = 4096;
@@ -27,8 +31,9 @@ struct vars {
     char *filename;
     int iterations;
     int threads;
-    int chunk_size;
+    off_t chunk_size;
     bool verbose;
+    bool worst_case;
 };
 
 __attribute__((noreturn))
@@ -38,6 +43,7 @@ static void usage(void) {
     fprintf(stderr, "  --iterations, -i     set number of iterations per page\n");
     fprintf(stderr, "  --chunk-size, -c     set size of chunks\n");
     fprintf(stderr, "  --threads, -t        set number of threads\n");
+    fprintf(stderr, "  --worst-case, -w     force worst case performance\n");
     fprintf(stderr, "  --verbose, -v        set verbose output\n");
     exit(EXIT_FAILURE);
 }
@@ -49,6 +55,7 @@ static void parse_opts(int argc, char **argv, struct vars *vars) {
     struct option options[] = {
         { "help",   0, 0, 'h' },
         { "verbose",   0, 0, 'v' },
+        { "worst-case",   0, 0, 'w' },
         { "iterations",   1, 0, 'i' },
         { "chunk-size",   1, 0, 'c' },
         { "threads",   1, 0, 't' },
@@ -56,7 +63,7 @@ static void parse_opts(int argc, char **argv, struct vars *vars) {
     };
     int idx;
 
-    while ((opt = getopt_long(argc, argv, "hvi:t:", options, &idx)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hvwi:t:c:", options, &idx)) != -1) {
         switch (opt) {
             case 'i':
                 vars->iterations = atoi(optarg);
@@ -69,6 +76,9 @@ static void parse_opts(int argc, char **argv, struct vars *vars) {
                 break;
             case 'v':
                 vars->verbose = true;
+                break;
+            case 'w':
+                vars->worst_case = true;
                 break;
             case 'h':
                 usage();
@@ -100,7 +110,7 @@ static void parse_opts(int argc, char **argv, struct vars *vars) {
 
     if (vars->chunk_size == 0) {
         vars->chunk_size = DEFAULT_CHUNK_SIZE;
-        printf("using default chunk size: %d\n", vars->chunk_size);
+        printf("using default chunk size: %ld\n", vars->chunk_size);
     }
 }
 
@@ -114,11 +124,25 @@ off_t filesize(int fd) {
     return ret;
 }
 
+struct timespec time_diff(struct timespec start,struct timespec end) {
+    struct timespec ret;
+    if ((end.tv_nsec - start.tv_nsec) < 0) {
+        ret.tv_sec = end.tv_sec - start.tv_sec - 1;
+        ret.tv_nsec = NSECS_IN_SEC + end.tv_nsec - start.tv_nsec;
+    } else {
+        ret.tv_sec = end.tv_sec - start.tv_sec;
+        ret.tv_nsec = end.tv_nsec - start.tv_nsec;
+    }
+    return ret;
+}
+
 int main(int argc, char **argv) {
     int iterations;
     int fd;
     off_t length;
     int pages;
+    struct timespec start, end;
+    int advice;
 
     volatile uint64_t sum;
 
@@ -139,6 +163,16 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
+    if (vars->chunk_size == -1 || vars->worst_case) {
+        vars->chunk_size = length;
+    }
+
+    if (vars->worst_case) {
+        advice = MADV_RANDOM;
+    } else {
+        advice = MADV_SEQUENTIAL;
+    }
+
     pages = length / PAGE_SIZE;
     if (vars->verbose) {
         printf("pages=%d\n", pages);
@@ -151,6 +185,9 @@ int main(int argc, char **argv) {
     PAPI_thread_init(pthread_self);
 
     omp_set_num_threads(vars->threads);
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
 #ifndef NO_OMP
 #pragma omp parallel reduction(+:sum)
 #endif
@@ -167,8 +204,9 @@ int main(int argc, char **argv) {
         while (remaining > 0) {
             to_read = remaining > vars->chunk_size ? vars->chunk_size : remaining;
             remaining -= to_read;
-            buf = mmap(NULL, to_read, PROT_READ, MAP_PRIVATE , fd, 0);
-            madvise(buf, to_read, MADV_SEQUENTIAL);
+            buf = mmap(NULL, to_read, PROT_READ, MAP_PRIVATE, fd, 0);
+            madvise(buf, to_read, advice);
+
             pages = 0;
             sum = 0;
 #ifndef NO_OMP
@@ -189,7 +227,13 @@ int main(int argc, char **argv) {
             printf("Thread %d pages:%'d instr/page:%'lld total instr:%'lld\n", omp_get_thread_num(), pages, values[0]/pages, values[0]);
         }
     }
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
     printf("sum=%'lu\n", sum);
+    struct timespec diff = time_diff(start, end);
+    double time = (double)diff.tv_sec + ((double)diff.tv_nsec / (double)NSECS_IN_SEC);
+    printf("Time : %ld.%lds\n", diff.tv_sec, diff.tv_nsec / NSECS_IN_MSEC);
+    printf("Bandwidth : %fMB/s\n", ((double)length/time)/(double)BYTES_IN_MBYTE);
 
     return 0;
 }
