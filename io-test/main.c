@@ -100,17 +100,23 @@ static void parse_opts(int argc, char **argv, struct vars *vars) {
     // Default values
     if (vars->iterations == 0) {
         vars->iterations = DEFAULT_ITERATIONS;
-        printf("using default iterations: %d\n", vars->iterations);
+        if (vars->verbose) {
+            printf("using default iterations: %d\n", vars->iterations);
+        }
     }
 
     if (vars->threads == 0) {
         vars->threads = DEFAULT_THREADS;
-        printf("using default threads: %d\n", vars->threads);
+        if (vars->verbose) {
+            printf("using default threads: %d\n", vars->threads);
+        }
     }
 
     if (vars->chunk_size == 0) {
         vars->chunk_size = DEFAULT_CHUNK_SIZE;
-        printf("using default chunk size: %ld\n", vars->chunk_size);
+        if (vars->verbose) {
+            printf("using default chunk size: %ld\n", vars->chunk_size);
+        }
     }
 }
 
@@ -232,8 +238,8 @@ int main(int argc, char **argv) {
     printf("sum=%'lu\n", sum);
     struct timespec diff = time_diff(start, end);
     double time = (double)diff.tv_sec + ((double)diff.tv_nsec / (double)NSECS_IN_SEC);
-    printf("Time : %ld.%lds\n", diff.tv_sec, diff.tv_nsec / NSECS_IN_MSEC);
-    printf("Bandwidth : %fMB/s\n", ((double)length/time)/(double)BYTES_IN_MBYTE);
+    printf("Time (s): %ld.%ld\n", diff.tv_sec, diff.tv_nsec / NSECS_IN_MSEC);
+    printf("Bandwidth (MB/s): %f\n", ((double)length/time)/(double)BYTES_IN_MBYTE);
 
     return 0;
 }
