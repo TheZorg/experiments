@@ -112,7 +112,7 @@ static void parse_opts(int argc, char **argv, struct vars *vars) {
         }
     }
 
-    if (vars->chunk_size == 0) {
+    if (vars->chunk_size == 0 && !vars->worst_case) {
         vars->chunk_size = DEFAULT_CHUNK_SIZE;
         if (vars->verbose) {
             printf("using default chunk size: %ld\n", vars->chunk_size);
@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
     struct timespec start, end;
     int advice;
 
-    volatile uint64_t sum;
+    volatile uint64_t sum = 0;
 
     struct vars *vars = calloc(1, sizeof(struct vars));
     parse_opts(argc, argv, vars);
@@ -171,6 +171,11 @@ int main(int argc, char **argv) {
 
     if (vars->chunk_size == -1 || vars->worst_case) {
         vars->chunk_size = length;
+    }
+
+    if (vars->chunk_size % PAGE_SIZE != 0) {
+        vars->chunk_size += (PAGE_SIZE - (vars->chunk_size % PAGE_SIZE));
+        printf("Growing chunk size to nearest page multiple: %'jd\n", vars->chunk_size);
     }
 
     if (vars->worst_case) {
@@ -201,24 +206,28 @@ int main(int argc, char **argv) {
         int i, j;
         long long int values[NUM_EVENTS];
         off_t remaining = length;
-        char *buf;
+        uint8_t *buf;
         off_t to_read;
-        int pages;
+        int pages = 0;
         int iterations = vars->iterations;
+        off_t offset = 0;
 
         PAPI_start_counters(events, NUM_EVENTS);
-        while (remaining > 0) {
+        while (offset < length) {
             to_read = remaining > vars->chunk_size ? vars->chunk_size : remaining;
             remaining -= to_read;
-            buf = mmap(NULL, to_read, PROT_READ, MAP_PRIVATE, fd, 0);
+            buf = mmap(NULL, to_read, PROT_READ, MAP_PRIVATE, fd, offset);
+            if (buf == MAP_FAILED) {
+                perror("mmap");
+                exit(EXIT_FAILURE);
+            }
+            offset += to_read;
             madvise(buf, to_read, advice);
 
-            pages = 0;
-            sum = 0;
 #ifndef NO_OMP
 #pragma omp for
 #endif
-            for (i = 0; i < to_read; i+= 4096) {
+            for (i = 0; i < to_read; i+= PAGE_SIZE) {
                 // Use only one byte per page
                 sum += buf[i];
                 for (j = 0; j < iterations; j++) {
@@ -231,6 +240,7 @@ int main(int argc, char **argv) {
         PAPI_read_counters(values, NUM_EVENTS);
         if (vars->verbose) {
             printf("Thread %d pages:%'d instr/page:%'lld total instr:%'lld\n", omp_get_thread_num(), pages, values[0]/pages, values[0]);
+            printf("Thread %d sum:%'lu\n", omp_get_thread_num(), sum);
         }
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
