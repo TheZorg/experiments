@@ -34,6 +34,7 @@ struct vars {
     off_t chunk_size;
     bool verbose;
     bool worst_case;
+    bool prefault;
 };
 
 __attribute__((noreturn))
@@ -44,6 +45,7 @@ static void usage(void) {
     fprintf(stderr, "  --chunk-size, -c     set size of chunks\n");
     fprintf(stderr, "  --threads, -t        set number of threads\n");
     fprintf(stderr, "  --worst-case, -w     force worst case performance\n");
+    fprintf(stderr, "  --prefault, -p       prefault pages when reading file\n");
     fprintf(stderr, "  --verbose, -v        set verbose output\n");
     exit(EXIT_FAILURE);
 }
@@ -56,6 +58,7 @@ static void parse_opts(int argc, char **argv, struct vars *vars) {
         { "help",   0, 0, 'h' },
         { "verbose",   0, 0, 'v' },
         { "worst-case",   0, 0, 'w' },
+        { "prefault",   0, 0, 'p' },
         { "iterations",   1, 0, 'i' },
         { "chunk-size",   1, 0, 'c' },
         { "threads",   1, 0, 't' },
@@ -63,7 +66,7 @@ static void parse_opts(int argc, char **argv, struct vars *vars) {
     };
     int idx;
 
-    while ((opt = getopt_long(argc, argv, "hvwi:t:c:", options, &idx)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hvwpi:t:c:", options, &idx)) != -1) {
         switch (opt) {
             case 'i':
                 vars->iterations = atoi(optarg);
@@ -79,6 +82,9 @@ static void parse_opts(int argc, char **argv, struct vars *vars) {
                 break;
             case 'w':
                 vars->worst_case = true;
+                break;
+            case 'p':
+                vars->prefault = true;
                 break;
             case 'h':
                 usage();
@@ -148,7 +154,7 @@ int main(int argc, char **argv) {
     off_t length;
     int pages;
     struct timespec start, end;
-    int advice;
+    int advice, mmap_flags;
 
     volatile uint64_t sum = 0;
 
@@ -184,6 +190,11 @@ int main(int argc, char **argv) {
         advice = MADV_SEQUENTIAL;
     }
 
+    mmap_flags = MAP_PRIVATE;
+    if (vars->prefault) {
+        mmap_flags |= MAP_POPULATE;
+    }
+
     pages = length / PAGE_SIZE;
     if (vars->verbose) {
         printf("pages=%d\n", pages);
@@ -216,7 +227,7 @@ int main(int argc, char **argv) {
         while (offset < length) {
             to_read = remaining > vars->chunk_size ? vars->chunk_size : remaining;
             remaining -= to_read;
-            buf = mmap(NULL, to_read, PROT_READ, MAP_PRIVATE, fd, offset);
+            buf = mmap(NULL, to_read, PROT_READ, mmap_flags, fd, offset);
             if (buf == MAP_FAILED) {
                 perror("mmap");
                 exit(EXIT_FAILURE);
