@@ -25,13 +25,16 @@ main() {
 
     for i in 1 10 100 1000 10000 100000
     do
-        echo -e "${cyan}Testing with $i iterations${NC}"
-        args="-t 1 -i $i"
-        echo -e "${blue}Cache cold${NC}"
-        ../scripts/cache_cold.sh $program $args $large_file
-        echo -e "${red}Cache hot${NC}"
-        $program $args $large_file
-        echo $separator
+        for t in 1 2 4 8
+        do
+            echo -e "${cyan}Testing with $i iterations, $t threads${NC}"
+            args="-t $t -i $i"
+            echo -e "${blue}Cache cold${NC}"
+            ../scripts/cache_cold.sh $program $args $large_file
+            echo -e "${red}Cache hot${NC}"
+            $program $args $large_file
+            echo $separator
+        done
     done
 }
 
