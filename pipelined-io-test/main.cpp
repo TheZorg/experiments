@@ -203,7 +203,9 @@ Chunk InputFunctor::operator()(tbb::flow_control &fc) const {
         }
         off_t remaining = filesize - metachunk.offset;
         metachunk.size = remaining > vars.meta_chunk_size ? vars.meta_chunk_size : remaining;
-        metachunk.start = static_cast<uint8_t*>(mmap(NULL, metachunk.size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, metachunk.offset));
+        int flags = MAP_PRIVATE;
+        if (vars.prefault) flags |= MAP_POPULATE;
+        metachunk.start = static_cast<uint8_t*>(mmap(NULL, metachunk.size, PROT_READ, flags, fd, metachunk.offset));
         if (metachunk.start == MAP_FAILED) {
             perror("mmap");
             exit(EXIT_FAILURE);
