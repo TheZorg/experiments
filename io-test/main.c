@@ -216,7 +216,6 @@ int main(int argc, char **argv) {
     {
         int i, j;
         long long int values[NUM_EVENTS];
-        off_t remaining = length;
         uint8_t *buf;
         off_t to_read;
         int pages = 0;
@@ -225,8 +224,8 @@ int main(int argc, char **argv) {
 
         PAPI_start_counters(events, NUM_EVENTS);
         while (offset < length) {
+            off_t remaining = length - offset;
             to_read = remaining > vars->chunk_size ? vars->chunk_size : remaining;
-            remaining -= to_read;
             buf = mmap(NULL, to_read, PROT_READ, mmap_flags, fd, offset);
             if (buf == MAP_FAILED) {
                 perror("mmap");
