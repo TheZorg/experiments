@@ -1,6 +1,6 @@
 CC=g++
-CFLAGS=-std=c++11 -ltbb -g -O0
-LDFLAGS=-std=c++11 -ltbb -g -O0
+CFLAGS=-std=c++11 -ltbb -g -O2
+LDFLAGS=-std=c++11 -ltbb -g -O2
 #CFLAGS=-g -O2
 #LDFLAGS=-g -O2
 DEPS=

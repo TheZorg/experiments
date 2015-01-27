@@ -245,14 +245,10 @@ uint64_t ProcessFunctor::operator()(Chunk input) const {
     uint64_t sum = 0;
     for (int i = 0; i < input.size; i += PAGE_SIZE) {
         sum += input.start[i];
-        __asm__ __volatile__(
-                "loop:"
-                "addq $0x1, %0;"
-                "dec %1;"
-                "jnz loop;"
-                : "=a"(sum)
-                : "c"(vars.iterations), "0"(sum)
-                );
+        for (int j = 0; j < vars.iterations; j++) {
+            sum++;
+            asm("");
+        }
     }
     return sum;
 }
