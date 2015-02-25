@@ -14,6 +14,10 @@
 #include <papi.h>
 #include <getopt.h>
 
+#define TRACEPOINT_DEFINE
+#define TRACEPOINT_CREATE_PROBES
+#include "tp.h"
+
 #define PROGNAME "io-test"
 
 #define NUM_EVENTS 1
@@ -22,7 +26,7 @@
 #define BYTES_IN_MBYTE 1000000
 
 static const char *const progname = PROGNAME;
-static const int PAGE_SIZE = 4096;
+static const int MY_PAGE_SIZE = 4096;
 static const int DEFAULT_ITERATIONS = 10000;
 static const int DEFAULT_CHUNK_SIZE = 8192000;
 static const int DEFAULT_THREADS = 1;
@@ -149,6 +153,7 @@ struct timespec time_diff(struct timespec start,struct timespec end) {
 }
 
 int main(int argc, char **argv) {
+    tracepoint(tracekit, begin);
     int iterations;
     int fd;
     off_t length;
@@ -179,8 +184,8 @@ int main(int argc, char **argv) {
         vars->chunk_size = length;
     }
 
-    if (vars->chunk_size % PAGE_SIZE != 0) {
-        vars->chunk_size += (PAGE_SIZE - (vars->chunk_size % PAGE_SIZE));
+    if (vars->chunk_size % MY_PAGE_SIZE != 0) {
+        vars->chunk_size += (MY_PAGE_SIZE - (vars->chunk_size % MY_PAGE_SIZE));
         printf("Growing chunk size to nearest page multiple: %'jd\n", vars->chunk_size);
     }
 
@@ -195,7 +200,7 @@ int main(int argc, char **argv) {
         mmap_flags |= MAP_POPULATE;
     }
 
-    pages = length / PAGE_SIZE;
+    pages = length / MY_PAGE_SIZE;
     if (vars->verbose) {
         printf("pages=%d\n", pages);
     }
@@ -237,7 +242,7 @@ int main(int argc, char **argv) {
 #ifndef NO_OMP
 #pragma omp for
 #endif
-            for (i = 0; i < to_read; i+= PAGE_SIZE) {
+            for (i = 0; i < to_read; i+= MY_PAGE_SIZE) {
                 // Use only one byte per page
                 sum += buf[i];
                 for (j = 0; j < iterations; j++) {
@@ -261,5 +266,6 @@ int main(int argc, char **argv) {
     printf("Time (s): %ld.%ld\n", diff.tv_sec, diff.tv_nsec / NSECS_IN_MSEC);
     printf("Bandwidth (MB/s): %f\n", ((double)length/time)/(double)BYTES_IN_MBYTE);
 
+    tracepoint(tracekit, end);
     return 0;
 }
