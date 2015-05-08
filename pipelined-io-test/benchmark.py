@@ -21,6 +21,8 @@ if __name__ == "__main__":
     parser.add_argument('input')
     parser.add_argument('output', nargs='?', default="out.csv")
     parser.add_argument('--threads', default=8, type=int)
+    parser.add_argument('--append', default=False, action="store_true")
+    parser.add_argument('--no-cache-hot', default=False, action="store_true", dest="no_cache_hot")
     parser.add_argument('--runs', default=1, type=int)
     args = parser.parse_args()
 
@@ -28,11 +30,14 @@ if __name__ == "__main__":
         print("Input file does not exist")
         sys.exit(-1)
 
-    csv_file = open(args.output, "w")
+    flags = "w"
+    if args.append:
+        flags = flags + "a"
+    csv_file = open(args.output, flags)
     writer = csv.writer(csv_file)
     writer.writerow(("threads","iterations","cache_cold","bandwidth"))
 
-    iterations = [1, 10, 100, 1000, 10000, 100000]
+    iterations = [1, 10, 100, 1000, 10000, 100000, 400000]
     program_name="./pipelined-io-test"
     cache_cold="../scripts/cache_cold.sh"
 
@@ -53,15 +58,16 @@ if __name__ == "__main__":
                 writer.writerow((threads,i,1,bandwidth))
 
             print("")
-            print(termcolors.red + "Cache hot" + termcolors.NC)
-            print("Run: ", end="", flush=True)
-            for r in range(args.runs):
-                print(str(r+1), end=" ", flush=True)
-                call_output = subprocess.check_output(call_args).decode("utf-8")
-                bandwidth = re.findall("Bandwidth.*$", call_output)[0].split()[-1]
-                writer.writerow((threads,i,0,bandwidth))
+            if not args.no_cache_hot:
+                print(termcolors.red + "Cache hot" + termcolors.NC)
+                print("Run: ", end="", flush=True)
+                for r in range(args.runs):
+                    print(str(r+1), end=" ", flush=True)
+                    call_output = subprocess.check_output(call_args).decode("utf-8")
+                    bandwidth = re.findall("Bandwidth.*$", call_output)[0].split()[-1]
+                    writer.writerow((threads,i,0,bandwidth))
 
-            print("")
+                print("")
             threads = threads * 2
 
     csv_file.close()
