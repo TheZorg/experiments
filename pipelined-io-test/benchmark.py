@@ -20,6 +20,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmarking")
     parser.add_argument('input')
     parser.add_argument('output', nargs='?', default="out.csv")
+    parser.add_argument('--disk', default="")
     parser.add_argument('--threads', default=8, type=int)
     parser.add_argument('--append', default=False, action="store_true")
     parser.add_argument('--no-cache-hot', default=False, action="store_true", dest="no_cache_hot")
@@ -35,7 +36,7 @@ if __name__ == "__main__":
         flags = flags + "a"
     csv_file = open(args.output, flags)
     writer = csv.writer(csv_file)
-    writer.writerow(("threads","iterations","cache_cold","bandwidth"))
+    writer.writerow(("disk","threads","iterations","cache_cold","bandwidth"))
 
     iterations = [1, 10, 100, 1000, 10000, 100000, 400000]
     program_name="./pipelined-io-test"
@@ -55,7 +56,7 @@ if __name__ == "__main__":
                 print(str(r+1), end=" ", flush=True)
                 call_output = subprocess.check_output([cache_cold] + call_args).decode("utf-8")
                 bandwidth = re.findall("Bandwidth.*$", call_output)[0].split()[-1]
-                writer.writerow((threads,i,1,bandwidth))
+                writer.writerow((args.disk,threads,i,1,bandwidth))
 
             print("")
             if not args.no_cache_hot:
@@ -65,7 +66,7 @@ if __name__ == "__main__":
                     print(str(r+1), end=" ", flush=True)
                     call_output = subprocess.check_output(call_args).decode("utf-8")
                     bandwidth = re.findall("Bandwidth.*$", call_output)[0].split()[-1]
-                    writer.writerow((threads,i,0,bandwidth))
+                    writer.writerow((args.disk,threads,i,0,bandwidth))
 
                 print("")
             threads = threads * 2
