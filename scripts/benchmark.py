@@ -34,12 +34,13 @@ if __name__ == "__main__":
 
     flags = "w"
     if args.append:
-        flags = flags + "a"
+        flags = "a"
+
     csv_file = open(args.output, flags)
     writer = csv.writer(csv_file)
     writer.writerow(("disk","threads","iterations","cache_cold","bandwidth"))
 
-    iterations = [1, 10, 100, 1000, 10000, 100000, 400000]
+    iterations = [1, 100, 1000, 10000, 100000, 400000]
     cache_cold="../scripts/cache_cold.sh"
 
     for i in iterations:
