@@ -28,7 +28,7 @@
 static const char *const progname = PROGNAME;
 static const int MY_PAGE_SIZE = 4096;
 static const int DEFAULT_ITERATIONS = 10000;
-static const int DEFAULT_CHUNK_SIZE = 8192000;
+static const int DEFAULT_CHUNK_SIZE = 2048 * MY_PAGE_SIZE;
 static const int DEFAULT_THREADS = 1;
 
 struct vars {
