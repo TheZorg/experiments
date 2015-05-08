@@ -26,7 +26,8 @@ static const int DEFAULT_ITERATIONS = 10000;
 static const int DEFAULT_THREADS = 1;
 static const int DEFAULT_NTOKENS = 32;
 static const int DEFAULT_META_CHUNK_SIZE = 2048 * PAGE_SIZE;
-static const int DEFAULT_CHUNK_SIZE = 32 * PAGE_SIZE;
+//static const int DEFAULT_CHUNK_SIZE = 32 * PAGE_SIZE;
+static const int DEFAULT_CHUNK_SIZE = DEFAULT_META_CHUNK_SIZE;
 
 struct Vars {
     std::string filename;
@@ -160,6 +161,7 @@ MetaChunk metachunk;
 struct Chunk {
     uint8_t *start = NULL;
     off_t size = 0;
+    uint64_t result = 0;
 };
 
 class InputFunctor {
@@ -229,7 +231,7 @@ class ProcessFunctor {
 public:
     ProcessFunctor(const Vars &vars);
     ProcessFunctor(const ProcessFunctor &other);
-    uint64_t operator()(Chunk input) const;
+    Chunk operator()(Chunk input) const;
 
 private:
     const Vars &vars;
@@ -241,7 +243,7 @@ ProcessFunctor::ProcessFunctor(const Vars &vars) : vars(vars) {
 ProcessFunctor::ProcessFunctor(const ProcessFunctor &other) : vars(other.vars) {
 }
 
-uint64_t ProcessFunctor::operator()(Chunk input) const {
+Chunk ProcessFunctor::operator()(Chunk input) const {
     uint64_t sum = 0;
     for (int i = 0; i < input.size; i += PAGE_SIZE) {
         sum += input.start[i];
@@ -250,18 +252,20 @@ uint64_t ProcessFunctor::operator()(Chunk input) const {
             asm("");
         }
     }
-    return sum;
+    input.result = sum;
+    return input;
 }
 
 uint64_t global_sum = 0;
 
 class OutputFunctor {
 public:
-    void operator()(uint64_t input) const;
+    void operator()(Chunk input) const;
 };
 
-void OutputFunctor::operator()(uint64_t input) const {
-    global_sum += input;
+void OutputFunctor::operator()(Chunk input) const {
+    global_sum += input.result;
+    munmap(input.start, input.size);
 }
 
 off_t get_filesize(int fd) {
@@ -315,8 +319,8 @@ int main(int argc, char **argv) {
     tbb::task_scheduler_init init(vars.threads);
 
     tbb::filter_t<void, Chunk> in(tbb::filter::serial_in_order, InputFunctor(fd, filesize, vars));
-    tbb::filter_t<Chunk, uint64_t> process(tbb::filter::parallel, ProcessFunctor(vars));
-    tbb::filter_t<uint64_t, void> out(tbb::filter::serial_out_of_order, OutputFunctor());
+    tbb::filter_t<Chunk, Chunk> process(tbb::filter::parallel, ProcessFunctor(vars));
+    tbb::filter_t<Chunk, void> out(tbb::filter::serial_out_of_order, OutputFunctor());
     tbb::filter_t<void,void> merge = in & process & out;
 
     timespec start, end;
