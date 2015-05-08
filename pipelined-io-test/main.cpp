@@ -24,7 +24,6 @@ static const int NSECS_IN_SEC = 1000000000;
 
 static const int DEFAULT_ITERATIONS = 10000;
 static const int DEFAULT_THREADS = 1;
-static const int DEFAULT_NTOKENS = 32;
 static const int DEFAULT_META_CHUNK_SIZE = 2048 * PAGE_SIZE;
 //static const int DEFAULT_CHUNK_SIZE = 32 * PAGE_SIZE;
 static const int DEFAULT_CHUNK_SIZE = DEFAULT_META_CHUNK_SIZE;
@@ -127,7 +126,7 @@ static void parse_opts(int argc, char **argv, Vars &vars) {
     }
 
     if (vars.ntokens == 0) {
-        vars.ntokens = DEFAULT_NTOKENS;
+        vars.ntokens = vars.threads;
         if (vars.verbose) {
             printf("using default ntokens: %d\n", vars.ntokens);
         }
