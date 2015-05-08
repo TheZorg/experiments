@@ -18,6 +18,7 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     parser = argparse.ArgumentParser(description="Benchmarking")
+    parser.add_argument('program_name')
     parser.add_argument('input')
     parser.add_argument('output', nargs='?', default="out.csv")
     parser.add_argument('--disk', default="")
@@ -39,7 +40,6 @@ if __name__ == "__main__":
     writer.writerow(("disk","threads","iterations","cache_cold","bandwidth"))
 
     iterations = [1, 10, 100, 1000, 10000, 100000, 400000]
-    program_name="./pipelined-io-test"
     cache_cold="../scripts/cache_cold.sh"
 
     for i in iterations:
@@ -48,7 +48,7 @@ if __name__ == "__main__":
             print(termcolors.cyan + 
                     "Testing with %s iterations, %s threads" % (i, threads) +
                     termcolors.NC)
-            call_args = [program_name, "-t", str(threads), "-i", str(i), "-n", str(64), args.input]
+            call_args = [args.program_name, "-t", str(threads), "-i", str(i), args.input]
 
             print(termcolors.blue + "Cache cold" + termcolors.NC)
             print("Run: ", end="", flush=True)
